@@ -10,6 +10,7 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
@@ -19,6 +20,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +32,8 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 
 
 class DisplayMap: Fragment(),
-        OnMapReadyCallback {
+        OnMapReadyCallback,
+        GoogleMap.OnMarkerClickListener {
     private lateinit var mMap: GoogleMap
     private lateinit var binding: FragmentDisplayMapBinding
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
@@ -150,10 +153,22 @@ class DisplayMap: Fragment(),
             // Log.d("check", "${shop.name}")
             mMap.addMarker(
                     MarkerOptions()
+                            .title("${shop.name}")
                             .position(LatLng(shop.geometry.location.lat,shop.geometry.location.lng))
             )
         }
     }
+
+    override fun onMarkerClick(marker: Marker): Boolean {
+        Toast.makeText(
+                requireContext(),
+                "店舗名 : ${marker.title}",
+                Toast.LENGTH_SHORT
+        ).show()
+
+        return false
+    }
+
 
     private fun initRetrofit() {
         locationService = Retrofit.Builder()
