@@ -13,6 +13,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.example.mapapp.databinding.FragmentDisplayMapBinding
 import com.google.android.gms.location.*
@@ -79,6 +80,11 @@ class DisplayMap: Fragment(),
         mapview.onCreate(savedInstanceState)
         mapview.onResume()
         mapview.getMapAsync(this)
+
+        // データあればピン立て
+        if (!noData()) {
+            standPin()
+        }
     }
 
     /**
@@ -111,11 +117,25 @@ class DisplayMap: Fragment(),
             // カメラをセットする
             mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location?.latitude!!, location?.longitude!!), 15F))
 
-            // 周囲情報取得
+             // 周囲情報取得
              scope.launch {
-                getShopInfo()
+                 // viewModelにデータ入ってなければ取得
+                 if (noData()) {
+                     getShopInfo()
+                 }
              }
         }
+    }
+
+    private fun noData(): Boolean{
+        var flag = true
+        viewModel.ShopInfos.observe(viewLifecycleOwner, Observer {
+            shopInfos ->
+            if (shopInfos.size  > 0) {
+                flag = false
+            }
+        })
+        return flag
     }
 
     // 半径500mの店舗を取得する
@@ -129,7 +149,22 @@ class DisplayMap: Fragment(),
 
         if (response.isSuccessful) {
             checkNext(response)
+            standPin()
         }
+    }
+
+    // ピン立て作業
+    fun standPin() {
+        viewModel.ShopInfos.observe(viewLifecycleOwner, Observer {
+            shopInfos ->
+            for (i in shopInfos) {
+                mMap.addMarker(
+                        MarkerOptions()
+                                .title(i.shopName)
+                                .position(LatLng(i.latitude!!, i.longitude!!))
+                )
+            }
+        })
     }
 
     // next_page_tokenをチェック
@@ -145,17 +180,17 @@ class DisplayMap: Fragment(),
         }
     }
 
-    // ショップにマーカする
+    // ショップ情報をviewModelに詰め込む.
     private fun responseLog(response: Response<LocationResponse>) {
         var body = response.body()
-
-        body?.results?.forEach {  shop ->
-            // Log.d("check", "${shop.name}")
-            mMap.addMarker(
-                    MarkerOptions()
-                            .title("${shop.name}")
-                            .position(LatLng(shop.geometry.location.lat,shop.geometry.location.lng))
-            )
+        body?.results?.forEach { shop ->
+            viewModel.ShopInfos.apply {
+                value?.add(ShopInfo(
+                        shopName = shop.name,
+                        longitude = shop.geometry.location.lng,
+                        latitude = shop.geometry.location.lat,
+                ))
+            }
         }
     }
 
@@ -165,10 +200,8 @@ class DisplayMap: Fragment(),
                 "店舗名 : ${marker.title}",
                 Toast.LENGTH_SHORT
         ).show()
-
         return false
     }
-
 
     private fun initRetrofit() {
         locationService = Retrofit.Builder()
@@ -183,7 +216,7 @@ class DisplayMap: Fragment(),
     private fun locationChanged() {
         val locationRequest = LocationRequest.create()
         locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-        locationRequest.interval = 40 * 1000
+        locationRequest.interval = 15 * 1000
         val locationCallback = object: LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 if (locationResult == null) {
@@ -198,13 +231,17 @@ class DisplayMap: Fragment(),
                                     longitude = location.longitude
                                 }
                         ) > 100) {
-                            scope.launch {
-                                getShopInfo()
-                            }
-                            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location?.latitude!!, location?.longitude!!), 15F))
+                            // 以前のピンを全て消す
+                            mMap.clear()
                             //　100m移動した最新の座標で以前の座標を上書き
                             viewModel.Coordinate.latitude = location.latitude
                             viewModel.Coordinate.longitude = location.longitude
+                            // カメラ移動
+                            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location?.latitude!!, location?.longitude!!), 15F))
+                            // 周辺情報の取得&ピンを立てる
+                            scope.launch (Dispatchers.IO){
+                                getShopInfo()
+                            }
                         }
                     }
                 }
