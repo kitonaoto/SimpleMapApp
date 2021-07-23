@@ -81,10 +81,6 @@ class DisplayMap: Fragment(),
         mapview.onResume()
         mapview.getMapAsync(this)
 
-        // データあればピン立て
-        if (!noData()) {
-            standPin()
-        }
     }
 
     /**
@@ -122,20 +118,22 @@ class DisplayMap: Fragment(),
                  // viewModelにデータ入ってなければ取得
                  if (noData()) {
                      getShopInfo()
+                 } else {
+                     standPin()
                  }
              }
         }
     }
 
     private fun noData(): Boolean{
-        var flag = true
+        var noData = true
         viewModel.ShopInfos.observe(viewLifecycleOwner, Observer {
             shopInfos ->
             if (shopInfos.size  > 0) {
-                flag = false
+                noData = false
             }
         })
-        return flag
+        return noData
     }
 
     // 半径500mの店舗を取得する
@@ -154,7 +152,7 @@ class DisplayMap: Fragment(),
     }
 
     // ピン立て作業
-    fun standPin() {
+    private fun standPin() {
         viewModel.ShopInfos.observe(viewLifecycleOwner, Observer {
             shopInfos ->
             for (i in shopInfos) {
